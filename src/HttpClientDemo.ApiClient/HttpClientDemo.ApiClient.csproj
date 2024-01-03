@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NSwag.MSBuild" Version="14.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <Target Name="NSwag" AfterTargets="PreBuildEvent" Condition="'$(Configuration)' == 'Debug'">
+    <Exec Command="$(NSwagExe_Net60) run csharpClient.nswag /variables:Configuration=$(Configuration)" />
+  </Target>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HttpClientDemo.Api\HttpClientDemo.Api.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>False</Private>
+    </ProjectReference>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,128 @@
+﻿@page "/todo"
+@rendermode InteractiveServer
+@using HttpClientDemo.Common.HttpClientService
+@using CreateTodoRequest = HttpClientDemo.Common.Dtos.CreateTodoRequest
+@using HttpClientDemo.ApiClient
+@using UpdateTodoRequest = HttpClientDemo.Common.Dtos.UpdateTodoRequest
+@attribute [StreamRendering]
+
+
+@inject IHttpClientService HttpClientService
+@inject IHttpClientDemoApiClient HttpClientDemoApiClient
+@inject ILogger<Todo> Logger
+
+<div class="todo-page">
+    <PageTitle>Todo</PageTitle>
+
+    <h1>Todo (@_inCompleteItemsCount)</h1>
+
+    @if (!string.IsNullOrEmpty(_message))
+    {
+        <div class="alert alert-danger" role="alert">
+            @_message
+        </div>
+    }
+
+    <ul>
+        @if (_todos != null && _todos.Any())
+        {
+            @foreach (var todo in _todos)
+            {
+                <li class="@(todo.IsComplete ? "completed" : "")">
+                    <input type="checkbox" @bind-value="todo.IsComplete" @bind-value:event="oninput" @onchange="eventArgs => UpdateTodoStatus(todo, eventArgs)" />
+                    <input @bind-value="todo.Title"/>
+                </li>
+            }
+        }
+    </ul>
+
+    <input type="text" placeholder="Something todo" @bind="_newTodo" />
+    <button @onclick="AddTodo">Add todo</button>
+</div>
+
+
+@code {
+    private List<TodoResponse>? _todos = new();
+    private string? _message;
+    private string? _newTodo;
+    private const string BaseUrl = "https://localhost:7191";
+    private int _inCompleteItemsCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // var response = await HttpClientService.GetRequestAsync<List<TodoResponse>>(BaseUrl, "todo-items", null);
+            var response = await HttpClientDemoApiClient.TodoItemsAsync();
+
+            _todos = response?.ToList();
+
+            if (_todos?.Count == 0)
+            {
+                _message = "No items found at the moment.";
+            }
+            else
+            {
+                if (_todos != null) _inCompleteItemsCount = _todos.Count(todo => !todo.IsComplete);
+            }
+        }
+        catch (Exception e)
+        {
+            Logger.LogError("Failed to load books: {Exception}", e);
+            _message = "An error occurred while searching for books. Please try again later.";
+        }
+    }
+
+    private async Task AddTodo()
+    {
+        if (!string.IsNullOrWhiteSpace(_newTodo))
+        {
+            try
+            {
+                var request = new CreateTodoRequest(_newTodo);
+                var response = await HttpClientService.PostRequestAsync<CreateTodoRequest, TodoResponse>(BaseUrl, "todo-items", request);
+
+                if (response != null)
+                {
+                    _newTodo = string.Empty;
+                    _todos?.Add(new TodoResponse
+                    {
+                        Id = response.Id,
+                        Title = response.Title,
+                        IsComplete = false
+                    });
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.LogError("Failed to add item: {Exception}", e);
+                _message = "An error occurred while trying to add item. Please try again later.";
+            }
+        }
+    }
+
+    private async Task UpdateTodoStatus(TodoResponse todo, ChangeEventArgs e)
+    {
+        try
+        {
+            if (bool.TryParse(e.Value?.ToString(), out var newValue))
+            {
+                var request = new UpdateTodoRequest
+                {
+                    Name = todo.Title,
+                    IsComplete = newValue
+                };
+                await HttpClientService.PutRequestAsync<UpdateTodoRequest>(BaseUrl, $"/todo-items/{todo.Id}", request);
+                _message = null; // Clear any previous error messages
+                StateHasChanged(); // This may be necessary to update the UI
+            }
+            
+        }
+        catch (Exception ex)
+        {
+            _message = $"Error updating todo: {ex.Message}";
+            Logger.LogError(ex, "Error updating todo item with id {TodoId}", todo.Id);
+        }
+    }
+
+}
